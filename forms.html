@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Questionários Interativos — Material Suplementar</title>
+  <meta name="description" content="Quizzes interativos com exportação/importação somente em JSON para envio por e-mail e análise local pelo professor."/>
+  <style>
+    :root {
+      --bg: #f9fafb;
+      --panel: #ffffff;
+      --card: #ffffff;
+      --text: #0b1220;
+      --muted: #475569;
+      --brand: #2563eb;
+      --accent: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --border: #d1d5db;
+      --shadow: 0 6px 18px rgba(2,6,23,.08);
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Helvetica Neue, Noto Sans, Arial; }
+    a { color: var(--brand); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 10; box-shadow: var(--shadow); }
+    header h1 { margin: 0; font-size: 18px; font-weight: 700; }
+    header .meta { grid-column: 1 / -1; font-size: 13px; color: var(--muted); margin-top: -2px; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn { border: 1px solid var(--border); background: #fff; border-radius: 10px; padding: 10px 14px; font-weight: 600; cursor: pointer; font-size: 14px; }
+    .btn-primary { background: var(--brand); color: #fff; border-color: transparent; }
+    .wrap { display: flex; flex-direction: column; min-height: calc(100dvh - 64px); }
+    nav { display: flex; gap: 8px; padding: 8px; background: var(--panel); border-bottom: 1px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .nav-btn { padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); cursor: pointer; font-size: 14px; white-space: nowrap; }
+    .nav-btn.active { background: var(--brand); color: #fff; border-color: transparent; }
+    main { padding: 16px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; margin-bottom: 16px; }
+    fieldset { border: none; margin: 0; padding: 0; }
+    legend { font-weight: 700; margin-bottom: 6px; }
+    label { display: block; margin: 6px 0 4px; }
+    input[type="text"], input[type="email"], textarea, select, input[type="number"], input[type="date"] { width: 100%; padding: 12px; background: #f3f4f6; border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 16px; }
+    input[type="radio"], input[type="checkbox"] { transform: translateY(1px); }
+    textarea { min-height: 96px; }
+    .q { padding: 12px; border: 1px solid var(--border); border-radius: 10px; margin: 10px 0; background: #fafafa; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+    th { position: sticky; top: 0; background: #f8fafc; z-index: 1; }
+    .footer { text-align: center; font-size: 13px; color: var(--muted); padding: 12px; border-top: 1px solid var(--border); }
+    @media (max-width: 860px) { header { grid-template-columns: 1fr; } .controls { justify-content: flex-start; } main { padding: 12px; } .card { padding: 12px; } .grid-3 { grid-template-columns: 1fr; } .nav-btn { font-size: 13px; }
+    }
+    /* ===== Impressão: mostrar apenas formulários ===== */
+    @media print {
+      header, nav, #results-panel, .footer, dialog { display: none !important; }
+      body { background: #fff !important; color: #000 !important; }
+      main { padding: 0 !important; }
+      .card { border: none !important; box-shadow: none !important; }
+      .q { border-color: #000 !important; background: #fff !important; }
+      input, textarea, select { background: #fff !important; color: #000 !important; border-color: #000 !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Questionários Interativos — Suporte ao Artigo</h1>
+    <div class="meta">Fluxo simplificado: aluno baixa um arquivo <b>JSON</b> com suas respostas e envia por e-mail; professor importa vários JSON para análise local.</div>
+    <div class="controls">
+      <button class="btn" id="btn-tutorial" type="button">Ajuda / Tutorial</button>
+      <button class="btn" id="btn-print" type="button" onclick="__printFallbackSimple();">Imprimir</button>
+      <button class="btn btn-primary" id="btn-results" type="button">Resultados (local)</button>
+      <button class="btn" id="btn-import" type="button">Importar JSON (professor)</button>
+      <input type="file" id="file-input" accept=".json" multiple style="display:none"/>
+      <button class="btn" id="btn-export-json" type="button" onclick="__exportFallback();">Exportar JSON (todos)</button>
+    </div>
+    <a id="__hiddenDownload" style="display:none"></a>
+  </header>
+
+  <!-- Fallbacks mínimos: rodam mesmo se o script principal falhar -->
+  <script>
+  (function(){
+    // Lê resultados direto do localStorage e força export via DataURL/navegação
+    window.__exportFallback = function(){
+      try{
+        var raw = localStorage.getItem('q_results_v5_json_only');
+        var data = raw ? raw : '[]';
+        var mime = 'application/json;charset=utf-8';
+        var filename = 'resultados.json';
+        // Safari-friendly: usar DataURL
+        var dataURL = 'data:'+mime+',' + encodeURIComponent(data);
+        var a = document.getElementById('__hiddenDownload');
+        if(!a){ a = document.createElement('a'); a.id='__hiddenDownload'; a.style.display='none'; document.body.appendChild(a); }
+        try{
+          a.setAttribute('href', dataURL);
+          a.setAttribute('download', filename);
+          a.setAttribute('target', '_blank');
+          a.click();
+        }catch(e){ try{ window.open(dataURL, '_blank'); }catch(e2){ location.href = dataURL; } }
+      }catch(err){ alert('Falha ao exportar: '+err); }
+    };
+
+    // Impressão direta; se falhar, abre nova aba só com os formulários
+    window.__printFallbackSimple = function(){
+      try{ window.print(); return; }catch(_){ }
+      try{
+        var cssEl = document.querySelector('style');
+        var css = cssEl? cssEl.innerHTML : '';
+        var host = document.getElementById('form-host');
+        var content = host? host.innerHTML : '<p>Nenhum formulário carregado.</p>';
+        var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Impressão</title><style>'+css+'@media screen{body{padding:12px}}</style></head><body>'+content+'</body></html>';
+        var w = window.open('', '_blank');
+        if(!w){ alert('Popup bloqueado. Habilite popups para imprimir.'); return; }
+        w.document.open(); w.document.write(html); w.document.close(); w.focus(); w.print();
+      }catch(err){ alert('Não foi possível imprimir: '+err); }
+    };
+  })();
+  </script>
+
+  <div class="wrap">
+    <nav id="nav-list"></nav>
+    <main>
+      <div id="form-host"></div>
+      <div class="card" id="results-panel" style="display:none">
+        <div class="row" style="align-items:center">
+          <h2 style="margin:0">Resultados</h2>
+          <span class="pill" id="results-count" style="margin-left:auto">0 respostas</span>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <label style="min-width:200px;flex:1">Filtrar por questionário
+            <select id="filter-quiz"></select>
+          </label>
+          <label style="min-width:200px;flex:1">Pesquisar (nome/email)
+            <input type="text" id="search-text" placeholder="Buscar..." />
+          </label>
+          <button class="btn" id="btn-clear-filter">Limpar filtros</button>
+        </div>
+        <div class="card" style="margin-top:12px; overflow:auto">
+          <table id="results-table"></table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="footer">Versão otimizada para dispositivos móveis — © 2025 Mario Reis</div>
+
+  <!-- Tutorial Passo a Passo (JSON-only) -->
+  <dialog id="tutorialDialog" style="border:none;border-radius:14px;padding:0;max-width:900px;width:96%;color:var(--text);background:var(--panel)">
+    <form method="dialog" class="card" style="margin:0">
+      <h3 style="margin:0 0 8px">Ajuda / Tutorial — Envio por arquivo <code>JSON</code></h3>
+
+      <h4 style="margin:6px 0">1) Para os alunos</h4>
+      <ol style="margin:0 8px 8px 20px">
+        <li>Abra o questionário desejado (abas no topo).</li>
+        <li>Preencha os campos (o <b>Nome</b> é <b>opcional</b>).</li>
+        <li>Clique em <b>Enviar resposta</b> ao final do formulário.</li>
+        <li>O navegador baixa um arquivo <b>.json</b> com suas respostas (ex.: <code>minha_resposta_anon.json</code>).</li>
+        <li>Envie esse arquivo por e-mail ao professor.</li>
+      </ol>
+
+      <h4 style="margin:6px 0">2) Para o professor (importação em massa)</h4>
+      <ol style="margin:0 8px 8px 20px">
+        <li>Baixe os anexos <b>.json</b> enviados pelos alunos.</li>
+        <li>Nesta página, clique em <b>Importar JSON (professor)</b> e selecione <b>todos os arquivos</b> de uma vez.</li>
+        <li>Os resultados importados aparecerão em <b>Resultados (local)</b>, com filtro e busca.</li>
+        <li>Use <b>Exportar JSON (todos)</b> para gerar um arquivo consolidado.</li>
+      </ol>
+
+      <h4 style="margin:6px 0">3) Impressão</h4>
+      <p class="muted">Use o botão <b>Imprimir</b>. A versão de impressão mostra apenas os formulários, pronta para papel.</p>
+
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="tutorial-close">Fechar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+  'use strict';
+  // =================== SCHEMA ===================
+  const QUIZZES = [
+    {
+      id: 'q1-stern-gerlach-poe',
+      titulo: 'Questionário 1 — Stern–Gerlach (POE)',
+      descricao: 'Predizer–Observar–Explicar sobre discretização, colapso e superposição (vídeo + simulador).',
+      camposIdent: true,
+      itens: [
+        { tipo:'radio', id:'q1', obrigatorio:true,
+          titulo:'Predição: no arranjo inicial do experimento (vídeo, até 0:44), onde os átomos irão parar no anteparo?',
+          opcoes:[
+            'irão parar em todas as direções do anteparo, como os ímãs no início do vídeo.',
+            'irão parar nas direções em cima e embaixo do anteparo.',
+            'irão parar no centro do anteparo.',
+            'irão parar apenas na direção de baixo do anteparo.',
+            'nenhuma das alternativas listadas acima (explique na justificativa).'
+          ]
+        },
+        { tipo:'textarea', id:'q2', titulo:'Observar/Explicar: o que você pode dizer sobre o fenômeno observado? Sua resposta anterior concorda com o vídeo? Justifique.' },
+        { tipo:'radio', id:'q3', obrigatorio:true,
+          titulo:'Predição: se colocarmos um obstáculo no “baixo/negativo” e mais um campo magnético, o que pode acontecer?',
+          opcoes:[
+            'passará apenas para a parte “de cima/positiva”.',
+            'passará tanto em “cima/positivo” quanto em “baixo/negativo”.',
+            'passará apenas na parte “de baixo/negativa”.',
+            'falta informação para responder.',
+            'nenhuma das alternativas listadas acima (explique na justificativa).'
+          ]
+        },
+        { tipo:'textarea', id:'q4', titulo:'Observar/Explicar: o resultado esperado te surpreendeu? Comente o comportamento observado e a relação com os valores mostrados sob os aparatos.' },
+        { tipo:'textarea', id:'q5', titulo:'Predição (livre): mantendo o obstáculo no “baixo/negativo” e alterando a direção de um campo magnético, o que pode acontecer? Justifique.' },
+        { tipo:'textarea', id:'q6', titulo:'Observar/Explicar: descreva o comportamento observado e relacione com os valores mostrados sob os aparatos que produzem o campo magnético.' },
+        { tipo:'radio', id:'q7', obrigatorio:true,
+          titulo:'Predição: mantendo a configuração anterior e acrescentando mais um campo magnético, o que pode acontecer?',
+          opcoes:[
+            'o átomo ficará “preso” no segundo campo magnético.',
+            'oscila entre “cima/positivo” e “baixo/negativo”.',
+            'passará apenas na parte “de cima/positiva”.',
+            'passará apenas na parte “de baixo/negativa”.',
+            'nenhuma das alternativas listadas acima (explique na justificativa).'
+          ]
+        },
+        { tipo:'textarea', id:'q8', titulo:'Observar/Explicar: analise o comportamento observado e sua relação com os valores mostrados sob os aparatos. Há relação com configurações anteriores?' },
+        { tipo:'text', id:'q9', titulo:'Representação: usando a notação |0⟩/|1⟩ apresentada, como representar o sistema na configuração da Figura 5 antes e depois da passagem pelo campo?' }
+      ]
+    },
+    {
+      id: 'encontro3-espaco-tempo',
+      titulo: 'Encontro 3 — Espaço‑tempo (IP)',
+      descricao: 'Coordenadas de eventos em S e S′ com velocidades relativas 0, 0,2c e 0,5c.',
+      camposIdent: true,
+      itens: [
+        { tipo:'radio', id:'p1', obrigatorio:true,
+          titulo:'v = 0. Evento B com d = 2 e t = 4. Como fica em S′?',
+          opcoes:[
+            'O evento B ocorre depois do evento A e tem coordenadas em S′ diferentes das coordenadas em S.',
+            'Não sei.',
+            'O evento B ocorre depois do evento A e tem as mesmas coordenadas do referencial S.',
+            'O evento B ocorre antes de A e tem as mesmas coordenadas do referencial S.'
+          ]
+        },
+        { tipo:'radio', id:'p2', obrigatorio:true,
+          titulo:'v = 0,2c. Sobre o evento B (d = 2, t = 4):',
+          opcoes:[
+            'ocorre depois de A e tem coordenadas diferentes do referencial S.',
+            'ocorre antes de A e tem coordenadas diferentes do referencial S.',
+            'ocorre depois de A e tem as mesmas coordenadas do referencial S.',
+            'Não sei.'
+          ]
+        },
+        { tipo:'radio', id:'p3', obrigatorio:true,
+          titulo:'v = 0,5c. Sobre o mesmo evento B:',
+          opcoes:[
+            'Os eventos são simultâneos em ambos os referenciais.',
+            'No referencial S′ os eventos são simultâneos pois ambos ocorrem no eixo t′.',
+            'O evento B possui coordenada espacial nula em S′.',
+            'Nenhuma das anteriores está correta.'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'encontro4-causalidade',
+      titulo: 'Encontro 4 — Causalidade (IP)',
+      descricao: 'Discussão de causalidade e inversão temporal aparente.',
+      camposIdent: true,
+      itens: [
+        { tipo:'radio', id:'p1', obrigatorio:true,
+          titulo:'v = 0,6c; B com d = 6 e t = 1. Em S′, é correto dizer que:',
+          opcoes:[
+            'B ocorre após A em ambos os referenciais.',
+            'os eventos são simultâneos.',
+            'o evento B ocorre antes de A no referencial S′.',
+            'não sei.'
+          ]
+        }
+      ]
+    },
+    {
+      id: 'encontro5-epr',
+      titulo: 'Encontro 5 — Emaranhamento / EPR (IP)',
+      descricao: 'Par emaranhado |Ψ−⟩ e colapso pós-medição.',
+      camposIdent: true,
+      itens: [
+        { tipo:'radio', id:'q1', obrigatorio:true,
+          titulo:'Suponha um arranjo do tipo EPR com emissão no estado |Ψ−⟩ = (|0⟩A|1⟩B − |1⟩A|0⟩B)/√2. O que pode ocorrer nas leituras?',
+          opcoes:[
+            'Ambos recebem feixes “para cima”.',
+            'Ambos recebem feixes “para baixo”.',
+            'Um recebe “para cima” e o outro “para baixo”.',
+            'O átomo se perde pela distância, impossibilitando medições.',
+            'Nenhuma das alternativas anteriores (explique).'
+          ]
+        },
+        { tipo:'radio', id:'q2', obrigatorio:true,
+          titulo:'Se no laboratório A o resultado foi “para cima”, qual é o estado |Ψ′⟩ após a medição?',
+          opcoes:[
+            '|Ψ′⟩ = |0⟩A|1⟩B',
+            '|Ψ′⟩ = |0⟩A(|1⟩B + |0⟩B)',
+            '|Ψ′⟩ = |1⟩A|1⟩B',
+            '|Ψ′⟩ = |0⟩A|0⟩B',
+            'Permanece inalterado.'
+          ]
+        },
+        { tipo:'textarea', id:'q2_just', titulo:'Justifique: a medição em A influencia instantaneamente o estado em B? Explique com base no colapso discutido.' }
+      ]
+    }
+  ];
+
+  // =================== ESTADO & STORAGE ===================
+  const LS_RESULTS = 'q_results_v5_json_only';
+  function loadResults(){ try {return JSON.parse(localStorage.getItem(LS_RESULTS))||[]} catch{ return [] } }
+  function saveResults(v){ localStorage.setItem(LS_RESULTS, JSON.stringify(v)); }
+  const results = loadResults();
+
+  // =================== ELEMENTOS ===================
+  const $ = (sel)=>document.querySelector(sel);
+  const on = (el, ev, fn)=>{ if(el) el.addEventListener(ev, fn, false); };
+
+  const nav = $('#nav-list');
+  const formHost = $('#form-host');
+  const resultsPanel = $('#results-panel');
+  const resultsCount = $('#results-count');
+  const resultsTable = $('#results-table');
+  const filterQuiz = $('#filter-quiz');
+  const searchText = $('#search-text');
+
+  const btnResults = $('#btn-results');
+  const btnImport = $('#btn-import');
+  const fileInput = $('#file-input');
+  const btnExportJson = $('#btn-export-json');
+  const btnTutorial = $('#btn-tutorial');
+  const btnPrint = $('#btn-print');
+  const tutorialDlg = document.getElementById('tutorialDialog');
+
+  // =================== NAV ===================
+  function renderNav(){
+    nav.innerHTML='';
+    QUIZZES.forEach(q=>{
+      const b = document.createElement('button');
+      b.className = 'nav-btn';
+      b.textContent = q.titulo;
+      b.onclick = ()=> { document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active')); b.classList.add('active'); renderQuiz(q.id); };
+      nav.appendChild(b);
+    });
+    const first = nav.querySelector('.nav-btn');
+    if(first){ first.classList.add('active'); renderQuiz(QUIZZES[0].id); }
+  }
+
+  // =================== FORM/QUIZ ===================
+  function renderQuiz(qid){
+    const quiz = QUIZZES.find(q=>q.id===qid) || QUIZZES[0];
+    resultsPanel.style.display='none';
+    formHost.innerHTML='';
+    if(!quiz){ formHost.innerHTML='<div class="card">Nenhum questionário definido.</div>'; return; }
+
+    const card = document.createElement('div'); card.className='card';
+    card.innerHTML = `<h2 style="margin:0">${quiz.titulo}</h2><p class="muted" style="margin:.2rem 0 1rem">${quiz.descricao||''}</p>`;
+
+    const form = document.createElement('form');
+    form.noValidate = true; // confiamos nos required dos itens
+    form.onsubmit = (e)=>{ e.preventDefault(); handleSubmit(quiz, new FormData(form)); };
+    on(form, 'reset', ()=>{ // garantir LIMPAR
+      setTimeout(()=>{
+        form.querySelectorAll('input[type="radio"],input[type="checkbox"]').forEach(i=> i.checked=false);
+        form.querySelectorAll('input[type="text"],input[type="email"],input[type="number"],input[type="date"],textarea').forEach(i=> i.value='');
+      }, 0);
+    });
+
+    if(quiz.camposIdent){
+      const idCard = document.createElement('div'); idCard.className='q';
+      idCard.innerHTML = `
+        <div class="row">
+          <label style="flex:1;min-width:180px">Nome <span class="muted">(opcional)</span>
+            <input name="__nome" type="text" placeholder="Seu nome" />
+          </label>
+          <label style="flex:1;min-width:180px">Email <span class="muted">(opcional)</span>
+            <input name="__email" type="email" placeholder="voce@exemplo.com" />
+          </label>
+          <label style="flex:1;min-width:160px">Turma / Código
+            <input name="__turma" type="text" placeholder="Ex.: FIS-101" />
+          </label>
+        </div>`;
+      form.appendChild(idCard);
+    }
+
+    quiz.itens.forEach((item, idx)=>{
+      const box = document.createElement('fieldset'); box.className='q';
+      const req = item.obrigatorio?'<span class="pill">obrigatório</span>':'';
+      const legend = document.createElement('legend'); legend.innerHTML = `${idx+1}. ${item.titulo} ${req}`; box.appendChild(legend);
+
+      if(item.tipo==='radio'){
+        item.opcoes.forEach(opt=>{
+          const label = document.createElement('label');
+          label.innerHTML = `<input type="radio" name="${item.id}" value="${escapeHTML(opt)}" ${item.obrigatorio?'required':''}/> ${escapeHTML(opt)}`;
+          box.appendChild(label);
+        });
+      }
+      if(item.tipo==='checkbox'){
+        item.opcoes.forEach(opt=>{
+          const label = document.createElement('label');
+          label.innerHTML = `<input type="checkbox" name="${item.id}" value="${escapeHTML(opt)}"/> ${escapeHTML(opt)}`;
+          box.appendChild(label);
+        });
+      }
+      if(item.tipo==='likert'){
+        const row = document.createElement('div'); row.className='row';
+        (item.escala||[1,2,3,4,5]).forEach(v=>{
+          const label = document.createElement('label');
+          label.innerHTML = `<input type="radio" name="${item.id}" value="${v}" ${item.obrigatorio?'required':''}/> ${v}`;
+          row.appendChild(label);
+        });
+        box.appendChild(row);
+      }
+      if(item.tipo==='text'){
+        const inp = document.createElement('input'); inp.type='text'; inp.name=item.id; inp.placeholder='Sua resposta'; box.appendChild(inp);
+      }
+      if(item.tipo==='textarea'){
+        const ta = document.createElement('textarea'); ta.name=item.id; ta.placeholder='Escreva sua resposta'; box.appendChild(ta);
+      }
+      if(item.tipo==='number'){
+        const inp = document.createElement('input'); inp.type='number'; inp.name=item.id; if(item.min!=null) inp.min=item.min; if(item.max!=null) inp.max=item.max; if(item.step!=null) inp.step=item.step; box.appendChild(inp);
+      }
+      if(item.tipo==='date'){
+        const inp = document.createElement('input'); inp.type='date'; inp.name=item.id; box.appendChild(inp);
+      }
+
+      form.appendChild(box);
+    });
+
+    const actions = document.createElement('div'); actions.className='row';
+    actions.innerHTML = `
+      <button class="btn btn-primary" type="submit">Enviar resposta</button>
+      <button class="btn" type="reset">Limpar</button>
+      <span class="muted">Após enviar, será oferecido o download de um arquivo JSON com sua resposta.</span>`;
+    form.appendChild(actions);
+
+    card.appendChild(form); formHost.appendChild(card);
+  }
+
+  // =================== UTIL ===================
+  function uuid(){return 'xxxxxx-xxxx-4xxx-yxxx-xxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16)})}
+  function nowISO(){return new Date().toISOString()}
+  function escapeHTML(s){ return String(s).replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])) }
+
+  function collectFormData(quiz, fd){
+    const respondent = {
+      nome: (fd.get('__nome')||'').toString().trim(),
+      email: (fd.get('__email')||'').toString().trim(),
+      turma: (fd.get('__turma')||'').toString().trim(),
+      rid: uuid()
+    };
+    const payload = { meta:{ quizId:quiz.id, quizTitulo:quiz.titulo, submittedAt: nowISO() }, respondent, respostas:{} };
+    quiz.itens.forEach(item=>{
+      if(item.tipo==='checkbox'){
+        payload.respostas[item.id] = fd.getAll(item.id).map(x=>x.toString());
+      } else {
+        const v = fd.get(item.id); payload.respostas[item.id] = v==null?'':v.toString();
+      }
+    });
+    return payload;
+  }
+
+  function handleSubmit(quiz, fd){
+    const rec = collectFormData(quiz, fd);
+    results.push(rec);
+    saveResults(results);
+    alert('Resposta registrada. Agora baixe o arquivo e envie por e-mail ao professor.');
+    const fname = 'minha_resposta_'+(rec.respondent.nome||'anon')+'.json';
+    download(fname, JSON.stringify(rec,null,2), 'application/json;charset=utf-8');
+    showResults('all');
+  }
+
+  // =================== RESULTADOS ===================
+  function showResults(quizId='all'){
+    resultsPanel.style.display='block';
+    formHost.innerHTML='';
+    renderResultsFilters(quizId); renderResultsTable();
+  }
+  function renderResultsFilters(selected='all'){
+    const ids = ['all',...QUIZZES.map(q=>q.id)];
+    filterQuiz.innerHTML='';
+    ids.forEach(id=>{ const opt=document.createElement('option'); opt.value=id; opt.textContent=(id==='all'?'Todos':id); if(id===selected) opt.selected=true; filterQuiz.appendChild(opt); });
+    resultsCount.textContent = `${results.length} respostas`;
+  }
+  function renderResultsTable(){
+    const qid = filterQuiz.value; const query = (searchText.value||'').toLowerCase();
+    const rows = results.filter(r=> qid==='all' || r.meta.quizId===qid ).filter(r=>{
+      const bag = `${r.respondent.nome} ${r.respondent.email} ${r.respondent.turma}`.toLowerCase();
+      return bag.includes(query);
+    });
+    if(rows.length===0){ resultsTable.innerHTML = '<tr><td class="muted">Sem resultados para o filtro atual.</td></tr>'; return; }
+    const cols = new Set(['submittedAt','quizId','nome','email','turma','rid']);
+    rows.forEach(r=>{ Object.keys(r.respostas).forEach(k=> cols.add(k)) });
+    const headers = Array.from(cols);
+    let thead = '<thead><tr>' + headers.map(h=>`<th>${escapeHTML(h)}</th>`).join('\n') + '</tr></thead>';
+    let tbody = '<tbody>' + rows.map(r=>{
+      const cells = headers.map(h=>{
+        let v='';
+        if(h==='submittedAt') v=r.meta.submittedAt;
+        else if(h==='quizId') v=r.meta.quizId;
+        else if(h==='nome') v=r.respondent.nome;
+        else if(h==='email') v=r.respondent.email;
+        else if(h==='turma') v=r.respondent.turma;
+        else if(h==='rid') v=r.respondent.rid;
+        else { v=r.respostas[h]; if(Array.isArray(v)) v=v.join('; '); }
+        return `<td>${escapeHTML(String(v||''))}</td>`
+      }).join('\n');
+      return `<tr>${cells}</tr>`
+    }).join('\n') + '</tbody>';
+    resultsTable.innerHTML = thead + tbody;
+  }
+
+  // =================== EXPORT / IMPORT (JSON ONLY) ===================
+  // ======= EXPORTAÇÃO (radical: ancora dedicada + múltiplos fallbacks, sem optional chaining) =======
+  function isIOS(){ return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream; }
+  function download(filename, content, mime){
+    var dataStr = String(content);
+    var mimeType = mime || 'application/json;charset=utf-8';
+    var a = document.getElementById('__hiddenDownload');
+    if(!a){ a = document.createElement('a'); a.id='__hiddenDownload'; a.style.display='none'; document.body.appendChild(a); }
+
+    // 1) Safari iOS/macOS: DataURL em nova aba OU navegação direta
+    if (isIOS() || /^((?!chrome|android).)*safari/i.test(navigator.userAgent)){
+      try{
+        var blob = new Blob([dataStr], {type:mimeType});
+        var fr = new FileReader();
+        fr.onloadend = function(){
+          try{
+            a.setAttribute('href', fr.result);
+            a.setAttribute('download', filename);
+            a.setAttribute('target', '_blank');
+            a.click();
+          }catch(e){
+            try{ window.open(fr.result, '_blank'); }catch(e2){ location.href = fr.result; }
+          }
+        };
+        fr.readAsDataURL(blob);
+        return;
+      }catch(e){ /* cai para Blob */ }
+    }
+
+    // 2) Caminho padrão com Blob + a[download]
+    try{
+      var blob2 = new Blob([dataStr], {type:mimeType});
+      if (window.navigator && window.navigator.msSaveOrOpenBlob){
+        window.navigator.msSaveOrOpenBlob(blob2, filename); return;
+      }
+      var url = URL.createObjectURL(blob2);
+      a.setAttribute('href', url);
+      a.setAttribute('download', filename);
+      a.removeAttribute('target');
+      a.click();
+      setTimeout(function(){ try{ URL.revokeObjectURL(url); }catch(_){} }, 800);
+      return;
+    }catch(err){ /* cai para dataURL */ }
+
+    // 3) DataURL puro
+    try{
+      var data = 'data:'+mimeType+',' + encodeURIComponent(dataStr);
+      a.setAttribute('href', data); a.setAttribute('download', filename); a.setAttribute('target','_blank'); a.click();
+      return;
+    }catch(err2){ /* cai para navegação */ }
+
+    // 4) Último recurso: navegar
+    try{ var data2 = 'data:'+mimeType+',' + encodeURIComponent(dataStr); location.href = data2; }
+    catch(err3){ alert('Falha ao baixar o arquivo. Desative bloqueio de pop‑ups e tente novamente. Detalhes: '+err3); }
+  }
+  
+  function importFiles(files){
+    const promises = Array.from(files).map(f=> f.text().then(txt=>({name:f.name, txt})) );
+    Promise.all(promises).then(list=>{
+      let added=0, failed=[];
+      list.forEach(({name,txt})=>{
+        try{
+          const obj = JSON.parse(txt);
+          if(Array.isArray(obj)) obj.forEach(o=>{ if(isRecord(o)){ results.push(o); added++; } });
+          else if(isRecord(obj)){ results.push(obj); added++; }
+          else failed.push(name);
+        }catch(e){ failed.push(name); }
+      });
+      saveResults(results); renderResultsTable(); resultsPanel.style.display='block';
+      alert(`Importação concluída. Adicionados: ${added}` + (failed.length? `\nFalhas: ${failed.join(', ')}`:''));
+    });
+  }
+
+  function isRecord(o){
+    return o && typeof o==='object' && o.meta && o.respondent && o.respostas;
+  }
+
+  // =================== EVENTOS & BOOT ===================
+  // Handlers universais (também expostos no window p/ onclick em Safari)
+  function handleExportClick(){
+    try{
+      const data = Array.isArray(results) ? results : [];
+      if(!data.length){ alert('Sem dados para exportar. Preencha um formulário e envie para testar.'); return; }
+      const blobStr = JSON.stringify(data, null, 2);
+      const fname = 'resultados.json';
+      download(fname, blobStr, 'application/json;charset=utf-8');
+    }catch(err){
+      console.error('Export JSON erro', err);
+      alert('Não foi possível exportar o JSON: '+err);
+    }
+  }
+  function handlePrintClick(){
+    // Fecha dialogs abertos
+    try{ var ds = document.querySelectorAll('dialog[open]'); for(var i=0;i<ds.length;i++){ var d=ds[i]; if(d && d.close) d.close(); } }catch(_){ }
+
+    // 1) Tenta nativo
+    try { window.print(); return; } catch(e) { /* prossegue */ }
+
+    // 2) Iframe dedicado com onload -> print
+    try{
+      var iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed'; iframe.style.right = '0'; iframe.style.bottom = '0';
+      iframe.style.width = '0'; iframe.style.height = '0'; iframe.style.border = '0';
+      document.body.appendChild(iframe);
+      var cssEl = document.querySelector('style');
+      var css = cssEl ? cssEl.innerHTML : '';
+      var host = document.getElementById('form-host');
+      var content = host ? host.innerHTML : '<p>Nenhum formulário carregado.</p>';
+      var doc = (iframe.contentWindow && iframe.contentWindow.document);
+      if(!doc) throw new Error('iframe sem document');
+      doc.open();
+      doc.write('<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Impressão</title><style>'+css+'@media screen{body{padding:12px}}</style></head><body>'+content+'</body></html>');
+      doc.close();
+      iframe.onload = function(){
+        try{ iframe.contentWindow.focus(); iframe.contentWindow.print(); }catch(e){ /* ignora */ }
+        setTimeout(function(){ try{ document.body.removeChild(iframe); }catch(_){} }, 1200);
+      };
+      return;
+    }catch(err){ /* prossegue */ }
+
+    // 3) Nova aba imprimível
+    try{
+      var cssEl2 = document.querySelector('style');
+      var css2 = cssEl2 ? cssEl2.innerHTML : '';
+      var host2 = document.getElementById('form-host');
+      var content2 = host2 ? host2.innerHTML : '<p>Nenhum formulário carregado.</p>';
+      var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Impressão</title><style>'+css2+'@media screen{body{padding:12px}}</style></head><body>'+content2+'</body></html>';
+      var w = window.open('', '_blank');
+      if(!w){ alert('Popup de impressão bloqueado. Habilite popups para imprimir.'); return; }
+      w.document.open(); w.document.write(html); w.document.close();
+      try{ w.focus(); w.print(); }catch(_){ }
+    }catch(e){ alert('Não foi possível iniciar a impressão. Verifique bloqueios do navegador.'); }
+  }
+  // Expor como onclick fallback
+  window.__doExport = function(ev){ if(ev && ev.preventDefault) ev.preventDefault(); handleExportClick(); };
+  window.__doPrint  = function(ev){ if(ev && ev.preventDefault) ev.preventDefault(); handlePrintClick(); };
+
+  on(btnExportJson, 'click', handleExportClick);
+  on(btnResults, 'click', ()=> showResults('all'));
+  on(btnImport, 'click', ()=> fileInput.click());
+  on(fileInput, 'change', ()=>{ if(fileInput.files && fileInput.files.length) importFiles(fileInput.files); fileInput.value=''; });
+
+  // Tutorial
+  on(btnTutorial, 'click', ()=>{ if(tutorialDlg && tutorialDlg.showModal){ tutorialDlg.showModal(); } else if (tutorialDlg) { tutorialDlg.setAttribute('open',''); } });
+  on($('#tutorial-close'), 'click', (e)=>{ e.preventDefault(); if(tutorialDlg && tutorialDlg.close){ try{ tutorialDlg.close(); }catch{} } else if (tutorialDlg){ tutorialDlg.removeAttribute('open'); } });
+
+  // Imprimir com fallback de janela separada
+  // (removido: mantemos apenas a estratégia unificada em handlePrintClick)
+  on(btnPrint, 'click', handlePrintClick);
+
+  on($('#btn-clear-filter'), 'click', ()=>{ if(filterQuiz) filterQuiz.value='all'; if(searchText) searchText.value=''; renderResultsTable(); });
+
+  function renderResultsTableSafe(){ try{ renderResultsTable(); }catch(e){ console.error('renderResultsTable erro', e); } }
+  function init(){ renderNav(); renderResultsTableSafe(); }
+
+  // =========== TESTES AUTOMÁTICOS (não alteram UI) ===========
+  function softAssert(cond, msg, arr){ if(!cond) arr.push(msg); }
+  function runTests(){
+    const fails = [];
+    // DOM básico
+    softAssert(!!document.querySelector('#nav-list'), 'nav-list inexistente', fails);
+    softAssert(!!document.querySelector('#form-host'), 'form-host inexistente', fails);
+    // Nav populado
+    const hasBtns = document.querySelectorAll('#nav-list .nav-btn').length > 0;
+    softAssert(hasBtns, 'nav-btns não renderizados', fails);
+    // JSON export básico
+    const before = results.length;
+    results.push({ meta:{quizId:'__test',submittedAt:'2025-01-01T00:00:00Z'}, respondent:{nome:'',email:'',turma:'T',rid:'x'}, respostas:{a:'1',b:['2','3']} });
+    const pack = JSON.stringify(results,null,2);
+    softAssert(pack.startsWith('[') && pack.includes('\"__test\"'), 'export JSON inválido', fails);
+    results.splice(before); // rollback
+    // Botões essenciais
+    ['#btn-tutorial','#btn-print','#btn-results','#btn-import','#btn-export-json'].forEach(sel=> softAssert(!!document.querySelector(sel), sel+' ausente', fails));
+    if(fails.length){ console.warn('[TEST WARNS]', fails); }
+    return fails;
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    try {
+      init();
+      const fails = runTests();
+      if(!fails.length) console.info('[OK] Boot + testes passaram');
+      else console.info('[OK] Boot com avisos de teste');
+    } catch (e) {
+      console.error('[BOOT ERROR]', e);
+      const host = document.getElementById('form-host');
+      if (host) host.innerHTML = '<div class="card" style="border-color:#dc2626">Falha ao iniciar: '+escapeHTML(String(e))+'</div>';
+    }
+  });
+  </script>
+</body>
+</html>
